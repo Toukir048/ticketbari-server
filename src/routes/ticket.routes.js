@@ -2,8 +2,11 @@ import express from "express";
 import {
   createTicket,
   deleteTicket,
+  getAdvertisedTickets,
   getAllTicketsForAdmin,
+  getApprovedTickets,
   getApprovedTicketsForAdvertisement,
+  getLatestTickets,
   getMyAddedTickets,
   getTicketById,
   toggleAdvertiseTicket,
@@ -15,10 +18,16 @@ import { verifyAdmin, verifyVendor } from "../middlewares/verifyRole.js";
 
 const router = express.Router();
 
-router.post("/", verifyToken, verifyVendor, createTicket);
+// public routes first
+router.get("/approved", getApprovedTickets);
+router.get("/advertised", getAdvertisedTickets);
+router.get("/latest", getLatestTickets);
 
+// vendor routes
+router.post("/", verifyToken, verifyVendor, createTicket);
 router.get("/my-tickets", verifyToken, verifyVendor, getMyAddedTickets);
 
+// admin routes
 router.get("/admin/all", verifyToken, verifyAdmin, getAllTicketsForAdmin);
 
 router.patch(
@@ -42,10 +51,9 @@ router.patch(
   toggleAdvertiseTicket
 );
 
+// dynamic id route must stay at the bottom
 router.get("/:id", verifyToken, getTicketById);
-
 router.patch("/:id", verifyToken, verifyVendor, updateTicket);
-
 router.delete("/:id", verifyToken, verifyVendor, deleteTicket);
 
 export default router;

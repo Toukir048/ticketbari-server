@@ -499,3 +499,131 @@ export const toggleAdvertiseTicket = async (req, res) => {
     });
   }
 };
+
+export const getApprovedTickets = async (req, res) => {
+  try {
+    const {
+      from,
+      to,
+      transportType,
+      sort,
+      page = 1,
+      limit = 6,
+    } = req.query;
+
+    const currentPage = Math.max(Number(page), 1);
+    const perPage = Math.min(Math.max(Number(limit), 6), 9);
+    const skip = (currentPage - 1) * perPage;
+
+    const query = {
+      verificationStatus: "approved",
+      isHidden: false,
+    };
+
+    if (from) {
+      query.from = { $regex: from, $options: "i" };
+    }
+
+    if (to) {
+      query.to = { $regex: to, $options: "i" };
+    }
+
+    if (transportType && transportType !== "All") {
+      query.transportType = transportType;
+    }
+
+    let sortOption = { createdAt: -1 };
+
+    if (sort === "price-asc") {
+      sortOption = { price: 1 };
+    }
+
+    if (sort === "price-desc") {
+      sortOption = { price: -1 };
+    }
+
+    const { ticketsCollection } = collections();
+
+    const totalTickets = await ticketsCollection.countDocuments(query);
+
+    const tickets = await ticketsCollection
+      .find(query)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(perPage)
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "Approved tickets loaded successfully.",
+      tickets,
+      pagination: {
+        totalTickets,
+        currentPage,
+        perPage,
+        totalPages: Math.ceil(totalTickets / perPage),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to load approved tickets.",
+      error: error.message,
+    });
+  }
+};
+
+export const getAdvertisedTickets = async (req, res) => {
+  try {
+    const { ticketsCollection } = collections();
+
+    const tickets = await ticketsCollection
+      .find({
+        verificationStatus: "approved",
+        isAdvertised: true,
+        isHidden: false,
+      })
+      .sort({ updatedAt: -1 })
+      .limit(6)
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "Advertised tickets loaded successfully.",
+      tickets,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to load advertised tickets.",
+      error: error.message,
+    });
+  }
+};
+
+export const getLatestTickets = async (req, res) => {
+  try {
+    const { ticketsCollection } = collections();
+
+    const tickets = await ticketsCollection
+      .find({
+        verificationStatus: "approved",
+        isHidden: false,
+      })
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "Latest tickets loaded successfully.",
+      tickets,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to load latest tickets.",
+      error: error.message,
+    });
+  }
+};
