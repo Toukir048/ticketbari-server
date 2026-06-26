@@ -1,0 +1,31 @@
+{
+  "name": "ticketbari-server",
+  "version": "1.0.0",
+  "description": "Backend API for TicketBari Online Ticket Booking Platform.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Toukir048/ticketbari-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Toukir048/ticketbari-server/issues"
+  },
+  "homepage": "https://github.com/Toukir048/ticketbari-server#readme",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
