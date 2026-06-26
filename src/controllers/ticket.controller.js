@@ -308,3 +308,194 @@ export const deleteTicket = async (req, res) => {
     });
   }
 };
+
+export const getAllTicketsForAdmin = async (req, res) => {
+  try {
+    const { ticketsCollection } = collections();
+
+    const tickets = await ticketsCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "All tickets loaded for admin successfully.",
+      tickets,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to load tickets for admin.",
+      error: error.message,
+    });
+  }
+};
+
+export const updateTicketVerificationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ticket ID.",
+      });
+    }
+
+    const allowedStatuses = ["approved", "rejected"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be approved or rejected.",
+      });
+    }
+
+    const { ticketsCollection } = collections();
+
+    const updateDoc = {
+      $set: {
+        verificationStatus: status,
+        updatedAt: new Date(),
+      },
+    };
+
+    if (status === "rejected") {
+      updateDoc.$set.isAdvertised = false;
+    }
+
+    const result = await ticketsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      updateDoc
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Ticket ${status} successfully.`,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update ticket verification status.",
+      error: error.message,
+    });
+  }
+};
+
+export const getApprovedTicketsForAdvertisement = async (req, res) => {
+  try {
+    const { ticketsCollection } = collections();
+
+    const tickets = await ticketsCollection
+      .find({
+        verificationStatus: "approved",
+        isHidden: false,
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "Approved tickets loaded for advertisement successfully.",
+      tickets,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to load approved tickets for advertisement.",
+      error: error.message,
+    });
+  }
+};
+
+export const toggleAdvertiseTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ticket ID.",
+      });
+    }
+
+    const { ticketsCollection } = collections();
+
+    const ticket = await ticketsCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found.",
+      });
+    }
+
+    if (ticket.verificationStatus !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Only approved tickets can be advertised.",
+      });
+    }
+
+    if (ticket.isHidden) {
+      return res.status(400).json({
+        success: false,
+        message: "Hidden tickets cannot be advertised.",
+      });
+    }
+
+    const nextAdvertiseStatus = !ticket.isAdvertised;
+
+    if (nextAdvertiseStatus) {
+      const advertisedCount = await ticketsCollection.countDocuments({
+        isAdvertised: true,
+        verificationStatus: "approved",
+        isHidden: false,
+      });
+
+      if (advertisedCount >= 6) {
+        return res.status(400).json({
+          success: false,
+          message: "You cannot advertise more than 6 tickets at a time.",
+        });
+      }
+    }
+
+    const result = await ticketsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          isAdvertised: nextAdvertiseStatus,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: nextAdvertiseStatus
+        ? "Ticket advertised successfully."
+        : "Ticket unadvertised successfully.",
+      isAdvertised: nextAdvertiseStatus,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle advertisement status.",
+      error: error.message,
+    });
+  }
+};
