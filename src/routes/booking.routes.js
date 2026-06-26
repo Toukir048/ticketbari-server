@@ -4,6 +4,7 @@ import {
   createBooking,
   getMyBookings,
   getVendorRequestedBookings,
+  updateBookingStatusByVendor,
 } from "../controllers/booking.controller.js";
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { verifyVendor } from "../middlewares/verifyRole.js";
@@ -19,6 +20,13 @@ router.get(
   verifyToken,
   verifyVendor,
   getVendorRequestedBookings
+);
+
+router.patch(
+  "/vendor/:id/status",
+  verifyToken,
+  verifyVendor,
+  updateBookingStatusByVendor
 );
 
 router.patch("/:id/cancel", verifyToken, cancelPendingBooking);

@@ -224,3 +224,85 @@ export const cancelPendingBooking = async (req, res) => {
     });
   }
 };
+
+export const updateBookingStatusByVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const vendorEmail = req.user?.email;
+    const { status } = req.body;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking ID.",
+      });
+    }
+
+    const allowedStatuses = ["accepted", "rejected"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be accepted or rejected.",
+      });
+    }
+
+    const { bookingsCollection } = collections();
+
+    const booking = await bookingsCollection.findOne({
+      _id: new ObjectId(id),
+      vendorEmail,
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found or you are not the ticket vendor.",
+      });
+    }
+
+    if (booking.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Only pending bookings can be updated. Current status is ${booking.status}.`,
+      });
+    }
+
+    const now = new Date();
+    const departureDate = new Date(booking.departureDateTime);
+
+    if (status === "accepted" && departureDate <= now) {
+      return res.status(400).json({
+        success: false,
+        message: "Expired booking cannot be accepted because departure time has already passed.",
+      });
+    }
+
+    const result = await bookingsCollection.updateOne(
+      { _id: new ObjectId(id), vendorEmail },
+      {
+        $set: {
+          status,
+          updatedAt: new Date(),
+          ...(status === "accepted" && { acceptedAt: new Date() }),
+          ...(status === "rejected" && { rejectedAt: new Date() }),
+        },
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message:
+        status === "accepted"
+          ? "Booking request accepted successfully."
+          : "Booking request rejected successfully.",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update booking status.",
+      error: error.message,
+    });
+  }
+};
