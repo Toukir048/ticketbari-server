@@ -1,10 +1,20 @@
-import dotenv from "dotenv";
+import "dotenv/config";
 import app from "./src/app.js";
-
-dotenv.config();
+import { connectDB } from "./src/config/db.js";
 
 const port = process.env.PORT || 5000;
 
-app.listen(port, () => {
-  console.log(`TicketBari server is running on port ${port}`);
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    app.listen(port, () => {
+      console.log(`TicketBari server is running on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
