@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { getDB } from "./config/db.js";
+import jwtRoutes from "./routes/jwt.routes.js";
 
 const app = express();
 
@@ -25,6 +26,8 @@ app.get("/health", (req, res) => {
     message: "TicketBari server health is okay",
   });
 });
+
+app.use("/api/jwt", jwtRoutes);
 
 app.get("/db-health", async (req, res) => {
   try {
