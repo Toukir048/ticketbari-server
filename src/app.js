@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { getDB } from "./config/db.js";
 import jwtRoutes from "./routes/jwt.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import ticketRoutes from "./routes/ticket.routes.js";
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.get("/health", (req, res) => {
 
 app.use("/api/jwt", jwtRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 app.get("/db-health", async (req, res) => {
   try {
