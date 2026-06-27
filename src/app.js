@@ -6,6 +6,7 @@ import jwtRoutes from "./routes/jwt.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
 import bookingRoutes from "./routes/booking.routes.js";
+import paymentRoutes from "./routes/payment.routes.js";
 
 const app = express();
 
@@ -29,11 +30,12 @@ app.get("/health", (req, res) => {
     message: "TicketBari server health is okay",
   });
 });
-
+//Route section
 app.use("/api/jwt", jwtRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.get("/db-health", async (req, res) => {
   try {
