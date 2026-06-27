@@ -1,5 +1,4 @@
 import { collections } from "../config/db.js";
-
 export const createOrUpdateUser = async (req, res) => {
   try {
     const { name, email, photoURL } = req.body;

@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./config/betterAuth.js";
+import { isOriginAllowed } from "./utils/allowedOrigins.js";
 
 import jwtRoutes from "./routes/jwt.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -18,22 +19,20 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
 
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  "http://localhost:5173",
-  "http://localhost:5174",
-].filter(Boolean);
+app.set("trust proxy", 1);
 
 const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
       return;
     }
 
-    callback(new Error("Not allowed by CORS"));
+    callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
@@ -47,6 +46,7 @@ app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "TicketBari server is running",
+    environment: process.env.NODE_ENV || "development",
   });
 });
 

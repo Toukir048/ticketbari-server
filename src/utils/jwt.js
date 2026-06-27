@@ -2,35 +2,31 @@ import jwt from "jsonwebtoken";
 
 const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const createToken = (email) => {
-  return jwt.sign(
-    {
-      email,
-    },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "7d",
-    }
-  );
+  return jwt.sign({ email }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
 };
 
-// Old route compatibility
 export const createJwtToken = createToken;
 
 export const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
   maxAge: sevenDays,
+  path: "/",
 };
 
 export const clearCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  path: "/",
 };
 
-// Old route compatibility
 export const getCookieOptions = () => cookieOptions;
 
 export const getClearCookieOptions = () => clearCookieOptions;
