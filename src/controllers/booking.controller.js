@@ -1,12 +1,13 @@
 import { ObjectId } from "mongodb";
 import { collections } from "../config/db.js";
+import { generateSeatLabels } from "../utils/seatMap.js";
 
 const isValidObjectId = (id) => ObjectId.isValid(id);
 
 export const createBooking = async (req, res) => {
   try {
     const userEmail = req.user?.email;
-    const { ticketId, bookingQuantity } = req.body;
+    const { ticketId, bookingQuantity, selectedSeats = [] } = req.body;
 
     if (!ticketId || !bookingQuantity) {
       return res.status(400).json({
@@ -76,8 +77,84 @@ export const createBooking = async (req, res) => {
     if (requestedQuantity > Number(ticket.quantity)) {
       return res.status(400).json({
         success: false,
-        message: "Booking quantity cannot be greater than available ticket quantity.",
+        message:
+          "Booking quantity cannot be greater than available ticket quantity.",
       });
+    }
+
+    const normalizedSelectedSeats = Array.isArray(selectedSeats)
+      ? selectedSeats
+          .map((seat) => String(seat).trim().toUpperCase())
+          .filter(Boolean)
+      : [];
+
+    if (normalizedSelectedSeats.length > 0) {
+      if (ticket.transportType !== "Bus") {
+        return res.status(400).json({
+          success: false,
+          message: "Seat selection is currently available only for bus tickets.",
+        });
+      }
+
+      if (normalizedSelectedSeats.length !== requestedQuantity) {
+        return res.status(400).json({
+          success: false,
+          message: "Selected seats count must match booking quantity.",
+        });
+      }
+
+      const uniqueSeats = new Set(normalizedSelectedSeats);
+
+      if (uniqueSeats.size !== normalizedSelectedSeats.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Duplicate seats are not allowed.",
+        });
+      }
+
+      const totalSeats =
+        Number(ticket.totalSeats) ||
+        Number(ticket.quantity) + Number(ticket.soldQuantity || 0);
+
+      const validSeats =
+        Array.isArray(ticket.seatLayout) && ticket.seatLayout.length > 0
+          ? ticket.seatLayout
+          : generateSeatLabels(totalSeats);
+
+      const invalidSeats = normalizedSelectedSeats.filter(
+        (seat) => !validSeats.includes(seat)
+      );
+
+      if (invalidSeats.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Some selected seats are invalid.",
+          invalidSeats,
+        });
+      }
+
+      const activeBookings = await bookingsCollection
+        .find({
+          ticketId: new ObjectId(ticketId),
+          status: { $in: ["pending", "accepted", "paid"] },
+        })
+        .toArray();
+
+      const unavailableSeats = activeBookings.flatMap(
+        (booking) => booking.selectedSeats || []
+      );
+
+      const alreadyBookedSeats = normalizedSelectedSeats.filter((seat) =>
+        unavailableSeats.includes(seat)
+      );
+
+      if (alreadyBookedSeats.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Some selected seats are already booked.",
+          alreadyBookedSeats,
+        });
+      }
     }
 
     const unitPrice = Number(ticket.price);
@@ -91,6 +168,7 @@ export const createBooking = async (req, res) => {
       userEmail,
       vendorEmail: ticket.vendorEmail,
       bookingQuantity: requestedQuantity,
+      selectedSeats: normalizedSelectedSeats,
       unitPrice,
       totalPrice,
       from: ticket.from,
@@ -274,7 +352,8 @@ export const updateBookingStatusByVendor = async (req, res) => {
     if (status === "accepted" && departureDate <= now) {
       return res.status(400).json({
         success: false,
-        message: "Expired booking cannot be accepted because departure time has already passed.",
+        message:
+          "Expired booking cannot be accepted because departure time has already passed.",
       });
     }
 

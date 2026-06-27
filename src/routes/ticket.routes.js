@@ -9,6 +9,7 @@ import {
   getLatestTickets,
   getMyAddedTickets,
   getTicketById,
+  getTicketSeatMap,
   toggleAdvertiseTicket,
   updateTicket,
   updateTicketVerificationStatus,
@@ -18,16 +19,33 @@ import { verifyAdmin, verifyVendor } from "../middlewares/verifyRole.js";
 
 const router = express.Router();
 
-// public routes first
+/*
+|--------------------------------------------------------------------------
+| Public ticket routes
+|--------------------------------------------------------------------------
+| এগুলো সবার আগে রাখতে হবে।
+| না হলে /approved, /advertised, /latest route কে Express ভুল করে /:id ধরে ফেলবে।
+*/
 router.get("/approved", getApprovedTickets);
+
 router.get("/advertised", getAdvertisedTickets);
+
 router.get("/latest", getLatestTickets);
 
-// vendor routes
+/*
+|--------------------------------------------------------------------------
+| Vendor ticket routes
+|--------------------------------------------------------------------------
+*/
 router.post("/", verifyToken, verifyVendor, createTicket);
+
 router.get("/my-tickets", verifyToken, verifyVendor, getMyAddedTickets);
 
-// admin routes
+/*
+|--------------------------------------------------------------------------
+| Admin ticket routes
+|--------------------------------------------------------------------------
+*/
 router.get("/admin/all", verifyToken, verifyAdmin, getAllTicketsForAdmin);
 
 router.patch(
@@ -51,9 +69,18 @@ router.patch(
   toggleAdvertiseTicket
 );
 
-// dynamic id route must stay at the bottom
+/*
+|--------------------------------------------------------------------------
+| Protected ticket details / seat map routes
+|--------------------------------------------------------------------------
+| এই route গুলো dynamic /:id route এর আগে থাকবে।
+*/
+router.get("/:id/seats", verifyToken, getTicketSeatMap);
+
 router.get("/:id", verifyToken, getTicketById);
+
 router.patch("/:id", verifyToken, verifyVendor, updateTicket);
+
 router.delete("/:id", verifyToken, verifyVendor, deleteTicket);
 
 export default router;

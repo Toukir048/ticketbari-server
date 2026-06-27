@@ -9,6 +9,7 @@ import {
 import { verifyToken } from "../middlewares/verifyToken.js";
 import { verifyVendor } from "../middlewares/verifyRole.js";
 
+
 const router = express.Router();
 
 router.post("/", verifyToken, createBooking);
