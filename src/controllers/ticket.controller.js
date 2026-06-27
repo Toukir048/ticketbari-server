@@ -1,122 +1,111 @@
 import { ObjectId } from "mongodb";
-import { collections } from "../config/db.js";
+import { collections,getDB  } from "../config/db.js";
 import { generateSeatLabels } from "../utils/seatMap.js";
 
 const isValidObjectId = (id) => ObjectId.isValid(id);
 
-export const createTicket = async (req, res) => {
-    try {
-        const vendorEmail = req.user?.email;
+export const createTicket = async (req, res, next) => {
+  try {
+    const db = getDB();
+    const ticketsCollection = db.collection("tickets");
 
-        const {
-            title,
-            from,
-            to,
-            transportType,
-            price,
-            quantity,
-            departureDateTime,
-            perks,
-            image,
-        } = req.body;
+    const {
+      title,
+      ticketTitle,
+      transportType,
+      from,
+      to,
+      departureDate,
+      departureTime,
+      arrivalDate,
+      arrivalTime,
+      price,
+      quantity,
+      availableQuantity,
+      image,
+      imageURL,
+      imageUrl,
+      description,
+      facilities,
+      vendorName,
+      vendorEmail,
+    } = req.body;
 
-        if (
-            !title ||
-            !from ||
-            !to ||
-            !transportType ||
-            !price ||
-            !quantity ||
-            !departureDateTime ||
-            !image
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "All required ticket fields must be provided.",
-            });
-        }
+    const finalTitle = title || ticketTitle;
+    const finalImage = image || imageURL || imageUrl;
+    const finalQuantity = Number(quantity);
+    const finalPrice = Number(price);
 
-        const allowedTransportTypes = ["Bus", "Train", "Launch", "Plane"];
+    const finalVendorEmail = vendorEmail || req.user?.email;
+    const finalVendorName = vendorName || "TicketBari Vendor";
 
-        if (!allowedTransportTypes.includes(transportType)) {
-            return res.status(400).json({
-                success: false,
-                message: "Transport type must be Bus, Train, Launch, or Plane.",
-            });
-        }
-
-        if (Number(price) <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Price must be greater than 0.",
-            });
-        }
-
-        if (Number(quantity) <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Ticket quantity must be greater than 0.",
-            });
-        }
-
-        const { usersCollection, ticketsCollection } = collections();
-
-        const vendor = await usersCollection.findOne({ email: vendorEmail });
-
-        if (!vendor) {
-            return res.status(404).json({
-                success: false,
-                message: "Vendor profile not found.",
-            });
-        }
-
-        if (vendor.isFraud) {
-            return res.status(403).json({
-                success: false,
-                message: "Fraud vendors cannot add tickets.",
-            });
-        }
-
-        const newTicket = {
-            title,
-            from,
-            to,
-            transportType,
-            price: Number(price),
-            quantity: Number(quantity),
-            totalSeats: Number(quantity),
-            seatLayout:
-                transportType === "Bus" ? generateSeatLabels(Number(quantity)) : [],
-            soldQuantity: 0,
-            departureDateTime: new Date(departureDateTime),
-            perks: Array.isArray(perks) ? perks : [],
-            image,
-            vendorName: vendor.name || "Unknown Vendor",
-            vendorEmail,
-            verificationStatus: "pending",
-            isAdvertised: false,
-            isHidden: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-
-        const result = await ticketsCollection.insertOne(newTicket);
-
-        res.status(201).json({
-            success: true,
-            message: "Ticket added successfully and waiting for admin approval.",
-            insertedId: result.insertedId,
-            ticket: newTicket,
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: "Failed to add ticket.",
-            error: error.message,
-        });
+    if (
+      !finalTitle ||
+      !transportType ||
+      !from ||
+      !to ||
+      !departureDate ||
+      !departureTime ||
+      !finalPrice ||
+      !finalQuantity ||
+      !finalImage ||
+      !finalVendorEmail
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "All required ticket fields must be provided.",
+        missingFields: {
+          title: !finalTitle,
+          transportType: !transportType,
+          from: !from,
+          to: !to,
+          departureDate: !departureDate,
+          departureTime: !departureTime,
+          price: !finalPrice,
+          quantity: !finalQuantity,
+          image: !finalImage,
+          vendorEmail: !finalVendorEmail,
+        },
+      });
     }
-};
 
+    const ticket = {
+      title: finalTitle.trim(),
+      transportType,
+      from: from.trim(),
+      to: to.trim(),
+      departureDate,
+      departureTime,
+      arrivalDate: arrivalDate || "",
+      arrivalTime: arrivalTime || "",
+      price: finalPrice,
+      quantity: finalQuantity,
+      availableQuantity: Number(availableQuantity) || finalQuantity,
+      image: finalImage,
+      imageURL: finalImage,
+      description: description || "",
+      facilities: Array.isArray(facilities) ? facilities : [],
+      vendorName: finalVendorName,
+      vendorEmail: finalVendorEmail,
+      verificationStatus: "pending",
+      isAdvertised: false,
+      isHidden: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const result = await ticketsCollection.insertOne(ticket);
+
+    res.status(201).json({
+      success: true,
+      message: "Ticket added successfully and waiting for admin approval.",
+      insertedId: result.insertedId,
+      ticket,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 export const getMyAddedTickets = async (req, res) => {
     try {
         const vendorEmail = req.user?.email;
