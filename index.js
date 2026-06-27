@@ -1,18 +1,26 @@
-import "dotenv/config";
-import app from "./src/app.js";
-import { connectDB } from "./src/config/db.js";
+import dotenv from "dotenv";
 
-const port = process.env.PORT || 5000;
+dotenv.config();
+
+const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MONGODB_URI is missing in .env file");
+    }
+
+    const { connectDB } = await import("./src/config/db.js");
+
     await connectDB();
 
-    app.listen(port, () => {
-      console.log(`TicketBari server is running on port ${port}`);
+    const { default: app } = await import("./src/app.js");
+
+    app.listen(PORT, () => {
+      console.log(`TicketBari server is running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Failed to start server:", error.message);
+    console.error("Failed to start TicketBari server:", error);
     process.exit(1);
   }
 };

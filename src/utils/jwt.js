@@ -1,24 +1,40 @@
 import jwt from "jsonwebtoken";
 
-const jwtSecret = process.env.JWT_SECRET;
+const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
-export const createJwtToken = (payload) => {
-  if (!jwtSecret) {
-    throw new Error("JWT_SECRET is missing in .env file");
-  }
-
-  return jwt.sign(payload, jwtSecret, {
-    expiresIn: "7d",
-  });
+export const createToken = (email) => {
+  return jwt.sign(
+    {
+      email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    }
+  );
 };
 
-export const getCookieOptions = () => {
-  const isProduction = process.env.NODE_ENV === "production";
+// Old route compatibility
+export const createJwtToken = createToken;
 
-  return {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  };
+export const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: sevenDays,
+};
+
+export const clearCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+};
+
+// Old route compatibility
+export const getCookieOptions = () => cookieOptions;
+
+export const getClearCookieOptions = () => clearCookieOptions;
+
+export const verifyJwt = (token) => {
+  return jwt.verify(token, process.env.JWT_SECRET);
 };
