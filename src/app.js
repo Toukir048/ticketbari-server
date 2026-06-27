@@ -7,6 +7,7 @@ import userRoutes from "./routes/user.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
 import bookingRoutes from "./routes/booking.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
+import vendorRoutes from "./routes/vendor.routes.js";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/vendor", vendorRoutes);
 
 app.get("/db-health", async (req, res) => {
   try {
