@@ -1,6 +1,9 @@
 import { collections } from "../config/db.js";
 
-const normalizeEmail = (email = "") => email.trim().toLowerCase();
+const normalizeEmail = (email = "") => {
+  if (typeof email !== "string") return "";
+  return email.trim().toLowerCase();
+};
 
 const createDefaultUser = async (email, name = "", photoURL = "") => {
   const { usersCollection } = collections();
