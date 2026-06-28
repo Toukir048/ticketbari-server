@@ -1,21 +1,23 @@
-export const getAllowedOrigins = () => {
-  const defaultOrigins = ["http://localhost:5173", "http://localhost:5174"];
+const normalizeUrl = (url = "") => {
+  return url.trim().replace(/\/+$/, "");
+};
 
+export const getAllowedOrigins = () => {
   const envOrigins = [
     process.env.CLIENT_URL,
-    ...(process.env.CLIENT_URLS ? process.env.CLIENT_URLS.split(",") : []),
+    ...(process.env.CLIENT_URLS || "").split(","),
   ];
 
-  return [...defaultOrigins, ...envOrigins]
+  const fallbackOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://ticketbari-client-ruby.vercel.app",
+  ];
+
+  return [...envOrigins, ...fallbackOrigins]
     .filter(Boolean)
-    .map((origin) => origin.trim().replace(/\/$/, ""));
+    .map(normalizeUrl)
+    .filter((origin, index, array) => array.indexOf(origin) === index);
 };
 
-export const isOriginAllowed = (origin) => {
-  if (!origin) return true;
-
-  const cleanOrigin = origin.trim().replace(/\/$/, "");
-  const allowedOrigins = getAllowedOrigins();
-
-  return allowedOrigins.includes(cleanOrigin);
-};
+export const normalizeOrigin = normalizeUrl;

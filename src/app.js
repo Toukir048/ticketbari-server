@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./config/betterAuth.js";
-import { isOriginAllowed } from "./utils/allowedOrigins.js";
+import { getAllowedOrigins, normalizeOrigin } from "./utils/allowedOrigins.js";
 
 import jwtRoutes from "./routes/jwt.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -19,16 +19,26 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
 
-app.set("trust proxy", 1);
+const allowedOrigins = getAllowedOrigins();
 
 const corsOptions = {
   origin(origin, callback) {
-    if (isOriginAllowed(origin)) {
+    if (!origin) {
       callback(null, true);
       return;
     }
 
-    callback(new Error(`Not allowed by CORS: ${origin}`));
+    const requestOrigin = normalizeOrigin(origin);
+
+    if (allowedOrigins.includes(requestOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    console.log("Blocked by CORS:", requestOrigin);
+    console.log("Allowed origins:", allowedOrigins);
+
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
