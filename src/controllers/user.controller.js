@@ -1,9 +1,48 @@
 import { collections } from "../config/db.js";
+
+const normalizeEmail = (email = "") => email.trim().toLowerCase();
+
+const createDefaultUser = async (email, name = "", photoURL = "") => {
+  const { usersCollection } = collections();
+
+  const normalizedEmail = normalizeEmail(email);
+
+  const newUser = {
+    name: name || normalizedEmail.split("@")[0] || "TicketBari User",
+    email: normalizedEmail,
+    photoURL: photoURL || "",
+    role: "user",
+    isFraud: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastLoginAt: new Date(),
+  };
+
+  await usersCollection.insertOne(newUser);
+
+  return usersCollection.findOne({ email: normalizedEmail });
+};
+
+const findOrCreateUserByEmail = async (email) => {
+  const { usersCollection } = collections();
+
+  const normalizedEmail = normalizeEmail(email);
+
+  let user = await usersCollection.findOne({ email: normalizedEmail });
+
+  if (!user) {
+    user = await createDefaultUser(normalizedEmail);
+  }
+
+  return user;
+};
+
 export const createOrUpdateUser = async (req, res) => {
   try {
     const { name, email, photoURL } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({
         success: false,
         message: "User email is required.",
@@ -12,20 +51,26 @@ export const createOrUpdateUser = async (req, res) => {
 
     const { usersCollection } = collections();
 
-    const existingUser = await usersCollection.findOne({ email });
+    const existingUser = await usersCollection.findOne({
+      email: normalizedEmail,
+    });
 
     if (existingUser) {
-      const updateDoc = {
-        $set: {
-          name: name || existingUser.name,
-          photoURL: photoURL || existingUser.photoURL,
-          lastLoginAt: new Date(),
-        },
-      };
+      await usersCollection.updateOne(
+        { email: normalizedEmail },
+        {
+          $set: {
+            name: name || existingUser.name || "TicketBari User",
+            photoURL: photoURL || existingUser.photoURL || "",
+            updatedAt: new Date(),
+            lastLoginAt: new Date(),
+          },
+        }
+      );
 
-      await usersCollection.updateOne({ email }, updateDoc);
-
-      const updatedUser = await usersCollection.findOne({ email });
+      const updatedUser = await usersCollection.findOne({
+        email: normalizedEmail,
+      });
 
       return res.status(200).json({
         success: true,
@@ -35,12 +80,13 @@ export const createOrUpdateUser = async (req, res) => {
     }
 
     const newUser = {
-      name: name || "No Name",
-      email,
+      name: name || normalizedEmail.split("@")[0] || "TicketBari User",
+      email: normalizedEmail,
       photoURL: photoURL || "",
       role: "user",
       isFraud: false,
       createdAt: new Date(),
+      updatedAt: new Date(),
       lastLoginAt: new Date(),
     };
 
@@ -61,59 +107,47 @@ export const createOrUpdateUser = async (req, res) => {
   }
 };
 
-export const getMyProfile = async (req, res) => {
+export const getMyProfile = async (req, res, next) => {
   try {
-    const email = req.user?.email;
+    const email = normalizeEmail(req.user?.email);
 
-    const { usersCollection } = collections();
-    const user = await usersCollection.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({
+    if (!email) {
+      return res.status(401).json({
         success: false,
-        message: "User profile not found.",
+        message: "Unauthorized access. Email not found in token.",
       });
     }
 
+    const user = await findOrCreateUserByEmail(email);
+
     res.status(200).json({
       success: true,
-      message: "User profile loaded successfully.",
       user,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to load user profile.",
-      error: error.message,
-    });
+    next(error);
   }
 };
 
-export const getUserRole = async (req, res) => {
+export const getUserRole = async (req, res, next) => {
   try {
-    const email = req.user?.email;
+    const email = normalizeEmail(req.user?.email);
 
-    const { usersCollection } = collections();
-    const user = await usersCollection.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({
+    if (!email) {
+      return res.status(401).json({
         success: false,
-        message: "User role not found.",
+        message: "Unauthorized access. Email not found in token.",
       });
     }
 
+    const user = await findOrCreateUserByEmail(email);
+
     res.status(200).json({
       success: true,
-      role: user.role,
-      isFraud: user.isFraud || false,
+      role: user.role || "user",
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to load user role.",
-      error: error.message,
-    });
+    next(error);
   }
 };
 
@@ -142,7 +176,7 @@ export const getAllUsers = async (req, res) => {
 
 export const updateUserRole = async (req, res) => {
   try {
-    const { email } = req.params;
+    const email = normalizeEmail(req.params.email);
     const { role } = req.body;
 
     const allowedRoles = ["user", "vendor", "admin"];
@@ -188,7 +222,7 @@ export const updateUserRole = async (req, res) => {
 
 export const markVendorAsFraud = async (req, res) => {
   try {
-    const { email } = req.params;
+    const email = normalizeEmail(req.params.email);
 
     const { usersCollection, ticketsCollection } = collections();
 
@@ -223,6 +257,7 @@ export const markVendorAsFraud = async (req, res) => {
       {
         $set: {
           isHidden: true,
+          hiddenReason: "Vendor marked as fraud",
           updatedAt: new Date(),
         },
       }
