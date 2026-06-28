@@ -4,10 +4,22 @@ import { isStripeConfigured, stripe } from "../config/stripe.js";
 
 const isValidObjectId = (id) => ObjectId.isValid(id);
 
+const getBookingAmount = (booking) =>
+  Number(booking.totalPrice ?? booking.totalAmount ?? booking.amount ?? 0);
+
+const getPaymentCurrency = () => process.env.STRIPE_CURRENCY || "usd";
+
 export const createPaymentIntent = async (req, res) => {
   try {
     const userEmail = req.user?.email;
     const { bookingId } = req.body;
+
+    if (!userEmail) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized access. User email is missing.",
+      });
+    }
 
     if (!bookingId) {
       return res.status(400).json({
@@ -54,7 +66,7 @@ export const createPaymentIntent = async (req, res) => {
       });
     }
 
-    const amount = Math.round(Number(booking.totalPrice) * 100);
+    const amount = Math.round(getBookingAmount(booking) * 100);
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
@@ -67,12 +79,12 @@ export const createPaymentIntent = async (req, res) => {
       return res.status(503).json({
         success: false,
         message:
-          "Stripe test key is not configured. Add STRIPE_SECRET_KEY to use real Stripe payment.",
-        fallbackAvailable: process.env.NODE_ENV !== "production",
+          "Stripe key is not configured. Demo payment is available for this booking.",
+        fallbackAvailable: true,
       });
     }
 
-    const currency = process.env.STRIPE_CURRENCY || "usd";
+    const currency = getPaymentCurrency();
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
@@ -93,7 +105,7 @@ export const createPaymentIntent = async (req, res) => {
       message: "Payment intent created successfully.",
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      amount: booking.totalPrice,
+      amount: getBookingAmount(booking),
       currency,
     });
   } catch (error) {
@@ -134,6 +146,13 @@ export const completePayment = async (req, res) => {
     const userEmail = req.user?.email;
     const { bookingId, transactionId, paymentIntentId } = req.body;
 
+    if (!userEmail) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized access. User email is missing.",
+      });
+    }
+
     if (!bookingId) {
       return res.status(400).json({
         success: false,
@@ -164,9 +183,11 @@ export const completePayment = async (req, res) => {
     }
 
     if (booking.status === "paid") {
-      return res.status(400).json({
-        success: false,
+      return res.status(200).json({
+        success: true,
         message: "This booking is already paid.",
+        transactionId: booking.transactionId || null,
+        bookingStatus: "paid",
       });
     }
 
@@ -227,14 +248,20 @@ export const completePayment = async (req, res) => {
       paymentIntentId ||
       `mock_txn_${Date.now()}_${booking._id.toString()}`;
 
+    const isStripePayment = isStripeConfigured && stripe && paymentIntentId;
+    const paymentMethod = isStripePayment ? "stripe" : "demo";
+    const paidAt = new Date();
+
     await bookingsCollection.updateOne(
       { _id: new ObjectId(bookingId), userEmail },
       {
         $set: {
           status: "paid",
-          paidAt: new Date(),
+          paymentStatus: "paid",
+          paymentMethod,
+          paidAt,
           transactionId: finalTransactionId,
-          updatedAt: new Date(),
+          updatedAt: paidAt,
         },
       }
     );
@@ -247,11 +274,12 @@ export const completePayment = async (req, res) => {
       ticketTitle: booking.ticketTitle,
       userEmail,
       vendorEmail: booking.vendorEmail,
-      amount: booking.totalPrice,
-      currency: process.env.STRIPE_CURRENCY || "usd",
-      paymentDate: new Date(),
-      paymentMethod: isStripeConfigured && paymentIntentId ? "stripe" : "development_mock",
-      createdAt: new Date(),
+      amount: getBookingAmount(booking),
+      currency: getPaymentCurrency(),
+      paymentDate: paidAt,
+      paymentMethod,
+      status: "paid",
+      createdAt: paidAt,
     };
 
     await paymentsCollection.insertOne(paymentDoc);
@@ -275,15 +303,9 @@ export const completePayment = async (req, res) => {
 
 export const mockPaymentSuccess = async (req, res) => {
   try {
-    if (process.env.NODE_ENV === "production") {
-      return res.status(403).json({
-        success: false,
-        message: "Mock payment is disabled in production.",
-      });
-    }
-
     req.body.transactionId =
-      req.body.transactionId || `mock_txn_${Date.now()}`;
+      req.body.transactionId || `demo_txn_${Date.now()}`;
+    req.body.paymentIntentId = null;
 
     return completePayment(req, res);
   } catch (error) {
